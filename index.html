@@ -80,7 +80,7 @@
 
 		<div class="mod-page plain">
 			<div>
-				<h2>> db.pages.find({title: "フロー概略"})</h2>
+				<h2>> db.pages.find({title: "準備"})</h2>
 				<ul>
 					<li>とりあえずすべてのメソッドに下記コードを注入
 						<pre class="brush: cpp">log() << typeid(this).name() << "::" << __func__ << endl;</pre>
@@ -93,50 +93,24 @@
 
 		<div class="mod-page plain">
 			<div>
-				<h2>&gt; db.pages.find({title: "フロー概略"})</h2>
-				<pre class="brush: bash">Mon Oct 17 01:55:10 [initandlisten] connection accepted from 127.0.0.1:65122 #1 (1 connection now open)
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr16MapReduceCommandE::run
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr6ConfigE::Config
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::JSFunction
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::JSFunction
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::State
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::sourceExists
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::init
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr8JSMapperE::init
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::init
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::init
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::init
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::switchMode
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::prepTempCollection
-Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0_inc
-Mon Oct 17 01:55:10 [conn1] build index test.tmp.mr.in_0_inc { 0: 1 }
-Mon Oct 17 01:55:10 [conn1] build index done 0 records 0 secs
-Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0
-Mon Oct 17 01:55:10 [conn1] build index test.tmp.mr.in_0 { _id: 1 }
-Mon Oct 17 01:55:10 [conn1] build index done 0 records 0 secs</pre>
-			</div>
-		</div>
-
-		<div class="mod-page plain">
-			<div>
-				<h2>&gt; db.pages.find({title: "フロー概略"})</h2>
+				<h2>&gt; db.pages.find({title: "フロー概略"}).limit(1)</h2>
 				<pre class="brush: bash">Mon Oct 17 01:55:10 [initandlisten] connection accepted from 127.0.0.1:65122 #1 (1 connection now open)
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr16MapReduceCommandE::run // <= MR起動
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr6ConfigE::Config // <= Configオブジェクト作成
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::JSFunction // <= mapper用関数オブジェクト作成
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::JSFunction // <= reducer用関数オブジェクト作成
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::State <= Stateオブジェクト作成
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::sourceExists <= dbのリソース確認
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::init <= 初期化
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr8JSMapperE::init <= 
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::init
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::init
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::init
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::switchMode
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::prepTempCollection
-Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0_inc
-Mon Oct 17 01:55:10 [conn1] build index test.tmp.mr.in_0_inc { 0: 1 }
-Mon Oct 17 01:55:10 [conn1] build index done 0 records 0 secs
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::State // <= Stateオブジェクト作成
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::sourceExists // <= dbのリソース確認
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::init // <= State初期化
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr8JSMapperE::init // <= Mapper初期化
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::init // <= (Mapper)関数初期化
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::init // <= Reducer初期化
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::init //<= (Reducer)関数初期化
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::switchMode // <= jsModeのチェック
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::prepTempCollection // <= mr出力用一時コレクション作成
+Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0_inc // <= 一時コレクションdrop
+Mon Oct 17 01:55:10 [conn1] build index test.tmp.mr.in_0_inc { 0: 1 } // <= 一時コレクションインデックス貼り
+Mon Oct 17 01:55:10 [conn1] build index done 0 records 0 secs 
 Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0
 Mon Oct 17 01:55:10 [conn1] build index test.tmp.mr.in_0 { _id: 1 }
 Mon Oct 17 01:55:10 [conn1] build index done 0 records 0 secs</pre>
@@ -208,6 +182,53 @@ _scope->setBoolean("_doFinal", _config.finalizer);</pre>
 _jsMode = _config.jsMode; // <= v2.0からのjsModeのフラグチェックとかもあります</pre>
 			</div>
 		</div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({title: "フロー概略"}).skip(1).limit(1)</h2>
+				<pre class="brush: bash">Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::insert
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::incomingDocuments
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr8JSMapperE::map
+Mon Oct 17 01:55:10 [conn1] fast_emit
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::emit
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::_add
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr8JSMapperE::map
+Mon Oct 17 01:55:10 [conn1] fast_emit
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::emit
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::_add
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::reduceInMemory
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::reduce
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::_reduce
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::_add
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::dumpToInc
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::_insertToInc
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::finalReduce
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::finalReduce
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::finalReduce</pre>
+			</div>
+		</div>
+		
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({title: "フロー概略"}).skip(2).limit(1)</h2>
+				<pre class="brush: bash">Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::insert
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::postProcessCollection
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::postProcessCollectionNonAtomic
+Mon Oct 17 01:55:10 [conn1] CMD: drop test.out
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::appendResults
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::~State
+Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0
+Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0_inc
+Mon Oct 17 01:55:10 [conn1] command test.$cmd command: { mapreduce: "in", map: function () {
+    emit(1, 1);
+}, reduce: function (k, vs) {
+    return vs.length;
+}, out: "out" } ntoreturn:1 reslen:127 125ms
+Mon Oct 17 01:55:10 [conn1] end connection 127.0.0.1:65122 (0 connections now open)</pre>
+			</div>
+		</div>
+
+		
 		<!--
 				<div class="mod-page shout">
 					<div>
