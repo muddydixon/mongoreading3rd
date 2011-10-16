@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>mongoreading mapreduce フローについて</title>
+    <script type="text/javascript" src="./js/shCore.js"></script>
+    <script type="text/javascript" src="./js/shBrushJScript.js"></script>
+    <script type="text/javascript" src="./js/shBrushBash.js"></script>
+    <script type="text/javascript" src="./js/shBrushCpp.js"></script>
+    <link href="./css/common.css" type="text/css" rel="stylesheet" media="Screen,projection" />
+    <link href="./css/shCore.css" type="text/css" rel="stylesheet" media="Screen,projection" />
+    <link href="./css/shThemeDefault.css" type="text/css" rel="stylesheet" media="Screen,projection" />
+	</head>
+	<body>
+		<div class="mod-page top"><div>
+				<h1 style="font-size: 20pt; text-align: left;">
+					<pre class="brush: js">> db.presentations.find({author: "muddydixon"})
+{
+  "_id" : ObjectId("4e7c86b120247a53b722c0ae"),
+  "title": "mapreduce フローについて",
+  "author": "Muddy Dixon",
+  "twitter": "@muddydixon",
+}</pre></h1>
+		</div></div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>自己紹介</h2>
+				<ul>
+					<li>大学/大学院：<ul>
+							<li>自然言語処理：形態素列検索・置換システム</li>
+							<li>言語発達の計算機シミュレーション(ElmanNet+SOMみたいな)</li>
+						</ul>
+					</li>
+					<li>就職：
+						<ul>
+							<li>検索エンジン(の広告最適化とか</li>
+							<li>コンテンツマッチエンジンの設計開発とか</li>
+							<li><a href="http://twitter.com/nifty_engineer">エンジニアサポート</a>の中の人とか</li>
+							<li>データマイニング<s>部門</s>個人</li>
+						</ul>
+					</li>
+				</ul>
+			</div>
+		</div>
+		
+		<div class="mod-page shout">
+			<div>
+				<p>僕はC++ができません。<br />できないなりに読んだ結果です。</p>
+			</div>
+		</div>
+		
+		<div class="mod-page plain">
+			<div>
+				<h2>> db.pages.find({}, {title: 1})</h2>
+				<ul>
+					<li>ターゲットファイル</li>
+					<li>フロー概略</li>
+					<li>個別概略
+						<ul>
+							<li>State</li>
+							<li>Config</li>
+							<li>JSMapper</li>
+							<li>JSReducer</li>
+						</ul>
+					</li>
+				</ul>
+			</div>
+		</div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>> db.pages.find({title: "ターゲットファイル"})</h2>
+				<ul>
+					<li>mongo/db/commands/mr.cpp</li>
+					<li>mongo/db/commands/mr.h</li>
+				</ul>
+			</div>
+		</div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>> db.pages.find({title: "フロー概略"})</h2>
+				<ul>
+					<li>とりあえずすべてのメソッドに下記コードを注入
+						<pre class="brush: cpp">log() << typeid(this).name() << "::" << __func__ << endl;</pre>
+					</li>
+					<li>これをやっておくと、logから「どのクラスのどのメソッドが呼ばれたか」をトレースできます。(デバッガ苦手です・・・)</li>
+					<li>最初はverbose切っておきます</li>
+				</ul>
+			</div>
+		</div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({title: "フロー概略"})</h2>
+				<pre class="brush: bash">Mon Oct 17 01:55:10 [initandlisten] connection accepted from 127.0.0.1:65122 #1 (1 connection now open)
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr16MapReduceCommandE::run
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr6ConfigE::Config
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::JSFunction
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::JSFunction
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::State
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::sourceExists
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::init
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr8JSMapperE::init
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::init
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::init
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::init
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::switchMode
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::prepTempCollection
+Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0_inc
+Mon Oct 17 01:55:10 [conn1] build index test.tmp.mr.in_0_inc { 0: 1 }
+Mon Oct 17 01:55:10 [conn1] build index done 0 records 0 secs
+Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0
+Mon Oct 17 01:55:10 [conn1] build index test.tmp.mr.in_0 { _id: 1 }
+Mon Oct 17 01:55:10 [conn1] build index done 0 records 0 secs</pre>
+			</div>
+		</div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({title: "フロー概略"})</h2>
+				<pre class="brush: bash">Mon Oct 17 01:55:10 [initandlisten] connection accepted from 127.0.0.1:65122 #1 (1 connection now open)
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr16MapReduceCommandE::run // <= MR起動
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr6ConfigE::Config // <= Configオブジェクト作成
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::JSFunction // <= mapper用関数オブジェクト作成
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::JSFunction // <= reducer用関数オブジェクト作成
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::State <= Stateオブジェクト作成
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::sourceExists <= dbのリソース確認
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::init <= 初期化
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr8JSMapperE::init <= 
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::init
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::init
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr10JSFunctionE::init
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::switchMode
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::prepTempCollection
+Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0_inc
+Mon Oct 17 01:55:10 [conn1] build index test.tmp.mr.in_0_inc { 0: 1 }
+Mon Oct 17 01:55:10 [conn1] build index done 0 records 0 secs
+Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0
+Mon Oct 17 01:55:10 [conn1] build index test.tmp.mr.in_0 { _id: 1 }
+Mon Oct 17 01:55:10 [conn1] build index done 0 records 0 secs</pre>
+			</div>
+		</div>
+
+
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({"title.p": "MapReduceCommand::run"})</h2>
+				<p>1040行目あたり</p>
+				<pre class="brush: cpp">state.init(); // (1)
+state.prepTempCollection(); // (2) </pre>
+				<ul>
+					<li>(1)
+						<p>
+							stateを初期化。内部では設定の各種読み込み(verboseやoutのモード、mapper/reducer/finalizer関数オブジェクト作成、query/sort/limit指定などを行う)
+						</p>
+					</li>
+					<li>(2)
+						<p>
+							mr中にshow collectionsすれば見られるが、mr結果流し込み用の一時collectionを作成する
+						</p>
+					</li>
+				</ul>
+			</div>
+		</div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({"title.p": "Config::Config"})</h2>
+				<pre class="brush: cpp"></pre>
+				<p>
+				</p>
+			</div>
+		</div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({"title.p": "JSFunction::JSFunction"})</h2>
+				<pre class="brush: cpp"></pre>
+				<p>
+				</p>
+			</div>
+		</div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({"title.p": "State::State"})</h2>
+				<pre class="brush: cpp"></pre>
+				<p>
+				</p>
+			</div>
+		</div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({"title.p": "State::init"})</h2>
+				<pre class="brush: cpp">_scope.reset(globalScriptEngine->getPooledScope( _config.dbname ).release() );
+_scope->localConnect( _config.dbname.c_str() );
+_config.mapper->init( this ); // <= mapper初期化
+_config.reducer->init( this ); // <= reducer初期化
+if ( _config.finalizer ) // <= finalizerがあれば
+  _config.finalizer->init( this ); // <= finerlizer初期化
+_scope->setBoolean("_doFinal", _config.finalizer);</pre>
+				<p>
+				</p>
+				<pre class="brush: cpp">// by default start in JS mode, will be faster for small jobs
+_jsMode = _config.jsMode; // <= v2.0からのjsModeのフラグチェックとかもあります</pre>
+			</div>
+		</div>
+		<!--
+				<div class="mod-page shout">
+					<div>
+						<p>目次</p>
+					</div>
+				</div>
+				-->
+		
+		<hr />
+		<ul class="mod-pager" id="pager"> <li id="pager-L"><a href="#">L</a></li> <li id="pager-R"><a href="#">R</a></li> </ul>
+		<p class="mod-pageNum" id="pageNum"> <span class="current" id="pageNum-current">0</span> / <span class="total" id="pageNum-total">0</span> </p>
+		
+    <script type="text/javascript" src="./js/jquery-1.5.2.min.js"></script>
+    <script type="text/javascript" src="./js/jquery.presentation.js"></script>
+		<script type="text/javascript">
+			SyntaxHighlighter.all();
+		</script>
+	</body>
+</html>
