@@ -113,27 +113,39 @@ Mon Oct 17 01:55:10 [conn1] build index test.tmp.mr.in_0_inc { 0: 1 } // <= 一�
 Mon Oct 17 01:55:10 [conn1] build index done 0 records 0 secs 
 Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0
 Mon Oct 17 01:55:10 [conn1] build index test.tmp.mr.in_0 { _id: 1 }
-Mon Oct 17 01:55:10 [conn1] build index done 0 records 0 secs</pre>
+Mon Oct 17 01:55:10 [conn1] build index done 0 records 0 secs
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::insert // <= system.indexesにnsとかの情報を書き込み(たぶん、このへんで、mrのoutをshardする、みたいのがあると思うけど、未追跡・・・</pre>
 			</div>
 		</div>
 
 
 		<div class="mod-page plain">
 			<div>
-				<h2>&gt; db.pages.find({"title.p": "MapReduceCommand::run"})</h2>
-				<p>1040行目あたり</p>
+				<h2>&gt; db.pages.find({"cls.mthd": "MapReduceCommand::run"})</h2>
+				<span>1040行目あたり</span>
 				<pre class="brush: cpp">state.init(); // (1)
 state.prepTempCollection(); // (2) </pre>
-				<ul>
-					<li>(1)
-						<p>
-							stateを初期化。内部では設定の各種読み込み(verboseやoutのモード、mapper/reducer/finalizer関数オブジェクト作成、query/sort/limit指定などを行う)
-						</p>
+				<span>1060行目あたり</span>
+				<pre class="brush: cpp">shared_ptr&lt;Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), config.filter, config.sort ); // (3)
+auto_ptr&lt;ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) ); // (4)</pre>
+				<span>1070行目あたり</span>
+				<pre class="brush: cpp">// go through each doc
+while ( cursor->ok() ) { // (5)</pre>
+				<ol>
+					<li>
+						stateを初期化。内部では設定の各種読み込み(verboseやoutのモード、mapper/reducer/finalizer関数オブジェクト作成、query/sort/limit指定などを行う)
 					</li>
-					<li>(2)
-						<p>
-							mr中にshow collectionsすれば見られるが、mr結果流し込み用の一時collectionを作成する
-						</p>
+					<li>
+						mr中にshow collectionsすれば見られるが、mr結果流し込み用の一時collectionを作成する
+					</li>
+					<li>
+						queryを満たす、documentのcursorのためのobjectを生成
+					</li>
+					<li>
+						queryを満たす、documentのcursorを取得
+					</li>
+					<li>
+						お待ちかねのmap処理
 					</li>
 				</ul>
 			</div>
@@ -141,34 +153,106 @@ state.prepTempCollection(); // (2) </pre>
 
 		<div class="mod-page plain">
 			<div>
-				<h2>&gt; db.pages.find({"title.p": "Config::Config"})</h2>
-				<pre class="brush: cpp"></pre>
+				<h2>&gt; db.pages.find({"cls.mthd": "Config::Config"})</h2>
+				<pre class="brush: cpp">mapper.reset( new JSMapper( cmdObj["map"] ) );
+reducer.reset( new JSReducer( cmdObj["reduce"] ) );
+if ( cmdObj["finalize"].type() && cmdObj["finalize"].trueValue() )
+  finalizer.reset( new JSFinalizer( cmdObj["finalize"] ) );</pre>
 				<p>
+					map/reduceクラスの生成や、outのオプションの処理、query生成、sort、limitとかを行う。
+				</p>
+				<p>
+					あんまり面白くない
 				</p>
 			</div>
 		</div>
 
 		<div class="mod-page plain">
 			<div>
-				<h2>&gt; db.pages.find({"title.p": "JSFunction::JSFunction"})</h2>
-				<pre class="brush: cpp"></pre>
+				<h2>&gt; db.pages.find({"cls.mthd": "JSFunction::JSFunction"})</h2>
+				<pre class="brush: cpp">JSFunction::JSFunction( string type , const BSONElement& e ) {
+  _type = type;
+  _code = e._asCode();
+  if ( e.type() == CodeWScope ){
+    _wantedScope = e.codeWScopeObject();
+  }
+}</pre>
 				<p>
+					関数定義を文字列で受け取ってクラス変数に格納
 				</p>
 			</div>
 		</div>
 
 		<div class="mod-page plain">
 			<div>
-				<h2>&gt; db.pages.find({"title.p": "State::State"})</h2>
-				<pre class="brush: cpp"></pre>
+				<h2>&gt; db.pages.find({"cls.mthd": "JSFunction::init"})</h2>
+				<pre class="brush: cpp">void JSFunction::init( State * state ) {
+  _scope = state->scope();
+  assert( _scope );
+  _scope->init( &_wantedScope );
+
+  _func = _scope->createFunction( _code.c_str() );
+  uassert( 13598 , str::stream() << "couldn't compile code for: " << _type , _func );
+
+  // install in JS scope so that it can be called in JS mode
+  _scope->setFunction(_type.c_str(), _code.c_str());
+}</pre>
 				<p>
+					スコープを初期化し、関数実体を生成
+					createFunction自体はengine(spidermonkey || v8 || java などに丸投げ)
 				</p>
 			</div>
 		</div>
 
 		<div class="mod-page plain">
 			<div>
-				<h2>&gt; db.pages.find({"title.p": "State::init"})</h2>
+				<h2>&gt; db.pages.find({"cls": "State"})</h2>
+				<pre class="brush: cpp">State::State( const Config& c )					
+State::~State()
+void State::init()
+					
+void State::prepTempCollection()
+long long State::postProcessCollection()
+					
+void State::appendResults( BSONObjBuilder& final )	
+long long State::postProcessCollectionNonAtomic()
+void State::insert( const string& ns , const BSONObj& o )
+void State::insertToInc( BSONObj& o )
+void State::_insertToInc( BSONObj& o )
+bool State::sourceExists()
+long long State::incomingDocuments()
+void State::switchMode(bool jsMode)
+void State::bailFromJS()
+void State::finalReduce( BSONList& values )
+void State::finalReduce( CurOp * op , ProgressMeterHolder& pm )
+void State::reduceInMemory()
+void State::dumpToInc()
+void State::emit( const BSONObj& a )
+void State::_add( InMemory* im, const BSONObj& a , long& size )
+void State::checkSize()</pre>
+				<p>
+					なんか、機能詰め込みすぎてイミフになってるクラス (全部は追っていません)
+				</p>
+			</div>
+		</div>
+		
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({"cls.mthd": "State::State"})</h2>
+				<p>
+					Stateオブジェクトにいろんな情報があったり、emitがあったりするので、面白いですが、ここでは格別面白くないです。
+				</p>
+				<p>
+					一点面白いのは、下記の部分で、_onDiskというフラグを持っているところです。これは、あとあといろんな所で出てきます。(だから、なになのかは未追跡)
+				</p>
+				<pre class="brush: cpp">_onDisk = _config.outType != Config::INMEMORY;</pre>
+
+			</div>
+		</div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({"cls.mthd": "State::init"})</h2>
 				<pre class="brush: cpp">_scope.reset(globalScriptEngine->getPooledScope( _config.dbname ).release() );
 _scope->localConnect( _config.dbname.c_str() );
 _config.mapper->init( this ); // <= mapper初期化
@@ -186,17 +270,17 @@ _jsMode = _config.jsMode; // <= v2.0からのjsModeのフラグチェックと�
 		<div class="mod-page plain">
 			<div>
 				<h2>&gt; db.pages.find({title: "フロー概略"}).skip(1).limit(1)</h2>
-				<pre class="brush: bash">Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::insert
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::incomingDocuments
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr8JSMapperE::map
+				<pre class="brush: bash">Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::incomingDocuments
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr8JSMapperE::map // <= map関数起動
+Mon Oct 17 01:55:10 [conn1] fast_emit // <= mapperの中のemitはfast_emitに置換されている (injectNative)
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::emit // <= fast_emit内でState::emitをcall
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::_add // <= State::emit内で_addをcall
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr8JSMapperE::map // <= 以下繰り返し
 Mon Oct 17 01:55:10 [conn1] fast_emit
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::emit
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::_add
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr8JSMapperE::map
-Mon Oct 17 01:55:10 [conn1] fast_emit
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::emit
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::_add
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::reduceInMemory
+
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::reduceInMemory // <=
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::reduce
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::_reduce
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::_add
