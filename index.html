@@ -2,7 +2,7 @@
 <html>
 	<head>
 		<meta charset="utf-8" />
-		<title>mongoreading mapreduce フローについて</title>
+		<title>mongoreading mapreduce 概観</title>
     <script type="text/javascript" src="./js/shCore.js"></script>
     <script type="text/javascript" src="./js/shBrushJScript.js"></script>
     <script type="text/javascript" src="./js/shBrushBash.js"></script>
@@ -17,7 +17,7 @@
 					<pre class="brush: js">> db.presentations.find({author: "muddydixon"})
 {
   "_id" : ObjectId("4e7c86b120247a53b722c0ae"),
-  "title": "mapreduce フローについて",
+  "title": "mapreduce 概観",
   "author": "Muddy Dixon",
   "twitter": "@muddydixon",
 }</pre></h1>
@@ -129,8 +129,9 @@ state.prepTempCollection(); // (2) </pre>
 				<pre class="brush: cpp">shared_ptr&lt;Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), config.filter, config.sort ); // (3)
 auto_ptr&lt;ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) ); // (4)</pre>
 				<span>1070行目あたり</span>
-				<pre class="brush: cpp">// go through each doc
-while ( cursor->ok() ) { // (5)</pre>
+				<pre class="brush: cpp">while ( cursor->ok() ) { // (5)</pre>
+				<span>1070行目あたり</span>
+				<pre class="brush: cpp">state.reduceInMemory(); // (6)</pre>
 				<ol>
 					<li>
 						stateを初期化。内部では設定の各種読み込み(verboseやoutのモード、mapper/reducer/finalizer関数オブジェクト作成、query/sort/limit指定などを行う)
@@ -146,6 +147,9 @@ while ( cursor->ok() ) { // (5)</pre>
 					</li>
 					<li>
 						お待ちかねのmap処理
+					</li>
+					<li>
+						そしてreduce処理
 					</li>
 				</ul>
 			</div>
@@ -280,27 +284,110 @@ Mon Oct 17 01:55:10 [conn1] fast_emit
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::emit
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::_add
 
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::reduceInMemory // <=
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::reduceInMemory // <= reduce処理開始
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::reduce
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::_reduce
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::_add
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::dumpToInc
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::dumpToInc // <= memory(out: inline)の場合以外は、DISCに書きこむ
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::_insertToInc
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::finalReduce // <= うっかりtupleが複数ある場合の予防線？ + finalizer
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::finalReduce
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::finalReduce
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::finalReduce</pre>
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr9JSReducerE::finalReduce
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::insert</pre>
 			</div>
 		</div>
 		
 		<div class="mod-page plain">
 			<div>
+				<h2>&gt; db.pages.find({"cls.mthd": "JSMapper::map"})</h2>
+				<span>JSMapper::map</span>
+				<pre class="brush: cpp">if ( s->invoke( _func.func() , &_params, &o , 0 , true, false, true ) )</pre>
+				<span>fast_emit (emitがinjectNativeでfast_emitになっている)</span>
+				<pre class="brush: cpp">state->emit( b.obj() );</pre>
+				<span>State::emit</span>
+				<pre class="brush: cpp">_add( _temp.get() , a , _size );</pre>
+				<span>State::_add</span>
+				<pre class="brush: cpp">BSONList& all = (*im)[a];
+all.push_back( a );</pre>
+				<p>
+					面白かったのは、mongodbのmapReduceで渡したmap関数のemitがinjectNativeでfast_emitされているところ。つまり、ここをいじればemitを思いのままにできたり、その他のメソッドを注入できたりする！
+				</p>
+			</div>
+		</div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({"cls.mthd": "State::reduceInMemory"})</h2>
+				<span>JSMapper::map</span>
+				<pre class="brush: cpp">for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); ++i ) {
+    BSONObj key = i->first;
+    BSONList& all = i->second;
+
+    if ( all.size() == 1 ) {
+        // only 1 value for this key
+        if ( _onDisk ) {
+            // this key has low cardinality, so just write to collection
+            writelock l(_config.incLong);
+            Client::Context ctx(_config.incLong.c_str());
+            _insertToInc( *(all.begin()) );
+        }
+        else {
+            // add to new map
+            _add( n.get() , all[0] , nSize );
+        }
+    }
+    else if ( all.size() > 1 ) {
+        // several values, reduce and add to map
+        BSONObj res = _config.reducer->reduce( all );
+        _add( n.get() , res , nSize );
+    }
+}</pre>
+				<p>
+					噂のIterator処理です。一応、iteratorの残サイズをチェックしたりしているのがわかります。size != 1の時にReducerが走っています。言い換えると、すべてがユニークな場合は、reducerは呼ばれない！？
+				</p>
+			</div>
+		</div>
+
+		<div class="mod-page plain">
+			<div>
+				<h2>&gt; db.pages.find({"cls.mthd": "State::finalReduce"})</h2>
+				<span>JSMapper::map</span>
+				<pre class="brush: cpp">if (tuples.size() == 1) {
+    // 1 obj, just use it
+    key = tuples[0];
+    BSONObjBuilder b(key.objsize());
+    BSONObjIterator it(key);
+    b.appendAs( it.next() , "_id" );
+    b.appendAs( it.next() , "value" );
+    res = b.obj();
+}
+else {
+    // need to reduce
+    int endSizeEstimate = 16;
+    _reduce( tuples , key , endSizeEstimate );
+    BSONObjBuilder b(endSizeEstimate);
+    b.appendAs( key.firstElement() , "_id" );
+    _func.scope()->append( b , "value" , "return" );
+    res = b.obj();
+}
+
+if ( finalizer ) {
+    res = finalizer->finalize( res );
+}</pre>
+				<p>
+					(k, v)が複数存在した場合(shardの時かな？)にmergeする + finalizerがここで発動
+				</p>
+			</div>
+		</div>
+
+		<div class="mod-page plain">
+			<div>
 				<h2>&gt; db.pages.find({title: "フロー概略"}).skip(2).limit(1)</h2>
-				<pre class="brush: bash">Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::insert
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::postProcessCollection
+				<pre class="brush: bash">Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::postProcessCollection // <= collectionの後処理
 Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::postProcessCollectionNonAtomic
 Mon Oct 17 01:55:10 [conn1] CMD: drop test.out
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::appendResults
-Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::~State
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::appendResults // <= 結果(かかった時間とか、map数とか)をオブジェクトに突っ込む
+Mon Oct 17 01:55:10 [conn1] PN5mongo2mr5StateE::~State // <= distructor
 Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0
 Mon Oct 17 01:55:10 [conn1] CMD: drop test.tmp.mr.in_0_inc
 Mon Oct 17 01:55:10 [conn1] command test.$cmd command: { mapreduce: "in", map: function () {
@@ -311,15 +398,6 @@ Mon Oct 17 01:55:10 [conn1] command test.$cmd command: { mapreduce: "in", map: f
 Mon Oct 17 01:55:10 [conn1] end connection 127.0.0.1:65122 (0 connections now open)</pre>
 			</div>
 		</div>
-
-		
-		<!--
-				<div class="mod-page shout">
-					<div>
-						<p>目次</p>
-					</div>
-				</div>
-				-->
 		
 		<hr />
 		<ul class="mod-pager" id="pager"> <li id="pager-L"><a href="#">L</a></li> <li id="pager-R"><a href="#">R</a></li> </ul>
